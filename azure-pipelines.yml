@@ -1,3 +1,4 @@
+
 # Deploy database changes using schemachange
 # https://github.com/Snowflake-Labs/schemachange
 # (see https://aka.ms/yaml for the YAML schema reference)
@@ -10,44 +11,26 @@ trigger:
     - /migrations
 pool:
   vmImage: 'ubuntu-latest'
-
+variables:
+- group: demo-variables
 steps:
-- task: DownloadSecureFile@1
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.9.x'
   inputs:
-   secureFile: 'snowflake-creds'
-  displayName: 'Download Snowflake Credentials'
-
-- task: SnowSQL@0
-  inputs:
-    serverName: 'https://be47328.us-gov-virginia.azure.snowflakecomputing.com'
-    accountName: 'JDAO.JDAONPROD'
-    databaseName: 'EDW_TEST'
-    # schemaName: '<schema_name>'
-    warehouseName: 'COMPUTE_WH'
-    role: 'SVC_RELEASE_ADMIN'
-    sqlStatements:
-      COPY INTO EDW_TEST.SCHEMACHANGE
-      FROM Deployment_Pipeline_Test.sql
-      CREDENTIALS = (
-        SNOWFLAKE_USER = 'SVC_Release_MGR',
-        SNOWFLAKE_PASSWORD = 'sczKUR4HQSOBoGW5D&EzQehxK',
-        SNOWFLAKE_ACCOUNT = 'https://be47328.us-gov-virginia.azure.snowflakecomputing.com',
-        SNOWFLAKE_REGION = 'US Gov Virginia')
-  displayName: 'Copy data from GitHub to Snowflake'
-
+    versionSpec: '3.9.x'
 - task: Bash@3
   inputs:
     targetType: 'inline'
     script: |
-      git clone https://github.com/Snowflake-Labs/schemachange.git
-      cd schemachange
-      ./gradlew build
-      ./gradlew installDist
-      cd..
-      ./schemachange/build/install/schemachange/bin/schemachange \
-        --url = <jdbc_url> \
-        --user = <user> \
-        --password = <password> \
-        --schemas = <schema_name> \
-        --changelog = <changelog_file>
-  displayName: 'Run schemachange'
+      echo 'Starting bash task'
+      echo "PROJECT_FOLDER $(PROJECT_FOLDER)"
+      python --version
+      echo 'Step 1: Installing schemachange'
+      pip install schemachange --upgrade
+      echo 'Step 2: Running schemachange'
+      schemachange -f $(PROJECT_FOLDER)/migrations -a $(SF_ACCOUNT) -u $(SF_USERNAME) -r $(SF_ROLE) -w $(SF_WAREHOUSE) -d $(SF_DATABASE) -c $(SF_DATABASE).SCHEMACHANGE.CHANGE_HISTORY --create-change-history-table
+  env:
+    SNOWFLAKE_PASSWORD: $(SF_PASSWORD)
+
+
+
